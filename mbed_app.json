@@ -32,7 +32,11 @@
             "sotp-num-sections"                : 2,
             "wifi-tx": "PTD3",
             "wifi-rx": "PTD2",
-            "main-stack-size"                  : 8192
+            "main-stack-size"                  : 8192,
+            "spif-driver.SPI_MOSI": "PTD6",
+            "spif-driver.SPI_MISO": "PTD7" ,
+            "spif-driver.SPI_CLK": "PTD5",
+            "spif-driver.SPI_CS": "PTD4"            
         },                     
         "K66F": {
             "sotp-section-1-address"           : "0x1FE000",

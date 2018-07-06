@@ -18,8 +18,8 @@
 
 #include "mbed.h"
 #include "simple-mbed-cloud-client.h"
-#include "SDBlockDevice.h"
-#include "FATFileSystem.h"
+#include "LittleFileSystem.h"
+#include "SPIFBlockDevice.h"
 #include "ESP8266Interface.h"
     
 // An event queue is a very useful structure to debounce information between contexts (e.g. ISR and normal threads)
@@ -31,8 +31,8 @@ Thread thread1;
 /* Hexiwear (+ Basedboard)*/ 
 InterruptIn sw2(PTA12);
 DigitalOut led2(LED2);
-SDBlockDevice sd(PTE3, PTE1, PTE2, PTE4);
-FATFileSystem fs("sd", &sd);
+SPIFBlockDevice spif(MBED_CONF_SPIF_DRIVER_SPI_MOSI, MBED_CONF_SPIF_DRIVER_SPI_MISO, MBED_CONF_SPIF_DRIVER_SPI_CLK, MBED_CONF_SPIF_DRIVER_SPI_CS);  //defined in mbed_app.json or spiflash driver
+LittleFileSystem fs("sd", &spif);  // must keep the name "sd" for the cloud client currently
 
 // Declaring pointers for access to Mbed Cloud Client resources outside of main()
 MbedCloudClientResource *button_res;
@@ -119,7 +119,7 @@ int main(void) {
     printf("Connected to the network successfully. IP address: %s\n", net.get_ip_address());
 
     // SimpleMbedCloudClient handles registering over LwM2M to Mbed Cloud
-    SimpleMbedCloudClient client(&net, &sd, &fs);
+    SimpleMbedCloudClient client(&net, &spif, &fs);
     int client_status = client.init();
     if (client_status != 0) {
         printf("Initializing Mbed Cloud Client failed (%d)\n", client_status);
