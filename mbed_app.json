@@ -5,7 +5,6 @@
         "MBED_CLIENT_USER_CONFIG_FILE=\"mbed_cloud_client_user_config.h\"",
         "MBED_CLOUD_CLIENT_USER_CONFIG_FILE=\"mbed_cloud_client_user_config.h\"",
         "PAL_DTLS_PEER_MIN_TIMEOUT=5000",
-        "MBED_CONF_APP_MAIN_STACK_SIZE=4608",
         "ARM_UC_USE_PAL_BLOCKDEVICE=1",
         "MBED_CLOUD_CLIENT_UPDATE_STORAGE=ARM_UCP_FLASHIAP_BLOCKDEVICE"
     ],
@@ -25,13 +24,23 @@
             "sotp-section-2-size"              : "0x1000",
             "sotp-num-sections"                : 2
         },
+        "HEXIWEAR": {
+            "sotp-section-1-address"           : "0xFE000",
+            "sotp-section-1-size"              : "0x1000",
+            "sotp-section-2-address"           : "0xFF000",
+            "sotp-section-2-size"              : "0x1000",
+            "sotp-num-sections"                : 2,
+            "wifi-tx": "PTD3",
+            "wifi-rx": "PTD2",
+            "main-stack-size"                  : 8192
+        },                     
         "K66F": {
             "sotp-section-1-address"           : "0x1FE000",
             "sotp-section-1-size"              : "0x1000",
             "sotp-section-2-address"           : "0x1FF000",
             "sotp-section-2-size"              : "0x1000",
             "sotp-num-sections"                : 2
-        }
+        }        
 
     },
     "config": {
@@ -68,6 +77,30 @@
             "help": "Number of SOTP sections",
             "macro_name": "PAL_INT_FLASH_NUM_SECTIONS",
             "value": null
+        },
+        "network-interface":{
+            "help": "Options are ETHERNET, WIFI_ESP8266, WIFI_ODIN",
+            "value": "WIFI_ESP8266"
+        },
+        "wifi-ssid": {
+            "help": "WiFi SSID",
+            "value": "\"SSID\""
+        },
+        "wifi-password": {
+            "help": "WiFi Password",
+            "value": "\"PASSWORD\""
+        },
+        "wifi-tx": {
+            "help": "TX pin for serial connection to external device",
+            "value": "D1"
+        },
+        "wifi-rx": {
+            "help": "RX pin for serial connection to external device",
+            "value": "D0"
+        },
+        "main-stack-size": {
+            "value": 8192
         }
+                
     }
 }

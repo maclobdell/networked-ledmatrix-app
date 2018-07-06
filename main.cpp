@@ -20,13 +20,17 @@
 #include "simple-mbed-cloud-client.h"
 #include "SDBlockDevice.h"
 #include "FATFileSystem.h"
-#include "EthernetInterface.h"
-
+#include "ESP8266Interface.h"
+    
 // An event queue is a very useful structure to debounce information between contexts (e.g. ISR and normal threads)
 // This is great because things such as network operations are illegal in ISR, so updating a resource in a button's fall() function is not allowed
 EventQueue eventQueue;
+Thread thread1;
 
 // Storage implementation definition, currently using SDBlockDevice (SPI flash, DataFlash, and internal flash are also available)
+/* Hexiwear (+ Basedboard)*/ 
+InterruptIn sw2(PTA12);
+DigitalOut led2(LED2);
 SDBlockDevice sd(PTE3, PTE1, PTE2, PTE4);
 FATFileSystem fs("sd", &sd);
 
@@ -34,13 +38,13 @@ FATFileSystem fs("sd", &sd);
 MbedCloudClientResource *button_res;
 MbedCloudClientResource *pattern_res;
 
-// This function gets triggered by the timer. It's easy to replace it by an InterruptIn and fall() mode on a real button
-void fake_button_press() {
-    int v = button_res->get_value_int() + 1;
-
-    button_res->set_value(v);
-
-    printf("Simulated button clicked %d times\n", v);
+static bool button_pressed = false;
+static int button_count = 0;
+      
+void button_press() {
+    button_pressed = true;
+    ++button_count;
+    button_res->set_value(button_count);
 }
 
 /**
@@ -101,11 +105,11 @@ void registered(const ConnectorClientEndpointInfo *endpoint) {
 
 int main(void) {
     printf("Starting Simple Mbed Cloud Client example\n");
-    printf("Connecting to the network using Ethernet...\n");
+    printf("Connecting to the network using WiFi...\n");
 
     // Connect to the internet (DHCP is expected to be on)
-    EthernetInterface net;
-    nsapi_error_t status = net.connect();
+    ESP8266Interface net(MBED_CONF_APP_WIFI_TX, MBED_CONF_APP_WIFI_RX);  //pins defined in mbed_app.json
+    nsapi_error_t status = net.connect(MBED_CONF_APP_WIFI_SSID, MBED_CONF_APP_WIFI_PASSWORD, NSAPI_SECURITY_WPA_WPA2);
 
     if (status != 0) {
         printf("Connecting to the network failed %d!\n", status);
@@ -146,11 +150,25 @@ int main(void) {
     // Register with Mbed Cloud
     client.register_and_connect();
 
-    // Placeholder for callback to update local resource when GET comes.
-    // The timer fires on an interrupt context, but debounces it to the eventqueue, so it's safe to do network operations
-    Ticker timer;
-    timer.attach(eventQueue.event(&fake_button_press), 5.0);
+    // Setup the button 
+      sw2.mode(PullUp);
+    
+    // The button fall handler is placed in the event queue so it will run in
+    // thread context instead of ISR context, which allows safely updating the cloud resource         
+      sw2.fall(eventQueue.event(&button_press));
+      button_count = 0;
 
-    // You can easily run the eventQueue in a separate thread if required
-    eventQueue.dispatch_forever();
+    // Start the event queue in a separate thread so the main thread continues
+    thread1.start(callback(&eventQueue, &EventQueue::dispatch_forever));
+
+    while(1)
+    {
+        wait_ms(100);
+
+        if (button_pressed) {
+            button_pressed = false;
+            printf("button clicked %d times\r\n", button_count);            
+        }
+        
+    }
 }
