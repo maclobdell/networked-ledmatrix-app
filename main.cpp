@@ -21,6 +21,14 @@
 #include "LittleFileSystem.h"
 #include "SPIFBlockDevice.h"
 #include "ESP8266Interface.h"
+#include "Adafruit_32x8matrix.h"
+#include "led_app.h"
+    
+#define I2C_ADDR1 0x70
+#define I2C_ADDR2 0x71
+#define ROTATION1 0
+#define ROTATION2 2
+#define BRIGHTNESS 1    
     
 // An event queue is a very useful structure to debounce information between contexts (e.g. ISR and normal threads)
 // This is great because things such as network operations are illegal in ISR, so updating a resource in a button's fall() function is not allowed
@@ -30,14 +38,19 @@ Thread thread1;
 // Storage implementation definition, currently using SDBlockDevice (SPI flash, DataFlash, and internal flash are also available)
 /* Hexiwear (+ Basedboard)*/ 
 InterruptIn sw2(PTA12);
-DigitalOut led2(LED2);
+
 SPIFBlockDevice spif(MBED_CONF_SPIF_DRIVER_SPI_MOSI, MBED_CONF_SPIF_DRIVER_SPI_MISO, MBED_CONF_SPIF_DRIVER_SPI_CLK, MBED_CONF_SPIF_DRIVER_SPI_CS);  //defined in mbed_app.json or spiflash driver
 LittleFileSystem fs("sd", &spif);  // must keep the name "sd" for the cloud client currently
+ 
+I2C i2c(PTD9, PTD8);
+ 
+Adafruit_32x8matrix matrix(&i2c, I2C_ADDR1, I2C_ADDR2, ROTATION1, ROTATION2, BRIGHTNESS);
 
 // Declaring pointers for access to Mbed Cloud Client resources outside of main()
 MbedCloudClientResource *button_res;
 MbedCloudClientResource *pattern_res;
 
+static bool mbc_registered = false;
 static bool button_pressed = false;
 static int button_count = 0;
       
@@ -64,26 +77,7 @@ void pattern_updated(MbedCloudClientResource *resource, m2m::String newValue) {
  * @param size Size of the body
  */
 void blink_callback(MbedCloudClientResource *resource, const uint8_t *buffer, uint16_t size) {
-    printf("POST received. Going to blink LED pattern: %s\n", pattern_res->get_value().c_str());
 
-    static DigitalOut augmentedLed(LED1); // LED that is used for blinking the pattern
-
-    // Parse the pattern string, and toggle the LED in that pattern
-    string s = std::string(pattern_res->get_value().c_str());
-    size_t i = 0;
-    size_t pos = s.find(':');
-    while (pos != string::npos) {
-        wait_ms(atoi(s.substr(i, pos - i).c_str()));
-        augmentedLed = !augmentedLed;
-
-        i = ++pos;
-        pos = s.find(':', pos);
-
-        if (pos == string::npos) {
-            wait_ms(atoi(s.substr(i, s.length()).c_str()));
-            augmentedLed = !augmentedLed;
-        }
-    }
 }
 
 /**
@@ -101,9 +95,13 @@ void button_callback(MbedCloudClientResource *resource, const NoticationDelivery
  */
 void registered(const ConnectorClientEndpointInfo *endpoint) {
     printf("Connected to Mbed Cloud. Endpoint Name: %s\n", endpoint->internal_endpoint_name.c_str());
+    set_led_color(LED_COLOR_BLUE);
+    set_led_on();
+    mbc_registered = true;
 }
 
 int main(void) {
+    set_led_color(LED_COLOR_BLUE);
     printf("Starting Simple Mbed Cloud Client example\n");
     printf("Connecting to the network using WiFi...\n");
 
@@ -113,16 +111,23 @@ int main(void) {
 
     if (status != 0) {
         printf("Connecting to the network failed %d!\n", status);
+        set_led_color(LED_COLOR_RED);
+        set_led_on();
         return -1;
     }
 
-    printf("Connected to the network successfully. IP address: %s\n", net.get_ip_address());
 
+    printf("Connected to the network successfully. IP address: %s\n", net.get_ip_address());
+    set_led_color(LED_COLOR_GREEN);
+    set_led_on();
+    
     // SimpleMbedCloudClient handles registering over LwM2M to Mbed Cloud
     SimpleMbedCloudClient client(&net, &spif, &fs);
     int client_status = client.init();
     if (client_status != 0) {
         printf("Initializing Mbed Cloud Client failed (%d)\n", client_status);
+        set_led_color(LED_COLOR_RED);
+        set_led_on();
         return -1;
     }
 
@@ -161,9 +166,26 @@ int main(void) {
     // Start the event queue in a separate thread so the main thread continues
     thread1.start(callback(&eventQueue, &EventQueue::dispatch_forever));
 
+    char msg1 [50];
+    char msg2 [50];
+    
+    snprintf(msg1, 50, "This is the IoT-Lab\0"); //pass in max chars to prevent overflow
+    snprintf(msg2, 50, "Connected to Mbed Cloud\0"); //pass in max chars to prevent overflow
+        
     while(1)
     {
-        wait_ms(100);
+
+        matrix.playText(msg1,strlen(msg1), 1);
+
+        wait_ms(3000);
+        
+        if (mbc_registered)
+        {
+            matrix.playText(msg2,strlen(msg2), 1);
+        }
+        matrix.playText(" ",strlen(" "), 1);
+        
+        wait_ms(7000);
 
         if (button_pressed) {
             button_pressed = false;
@@ -171,4 +193,5 @@ int main(void) {
         }
         
     }
+    
 }
